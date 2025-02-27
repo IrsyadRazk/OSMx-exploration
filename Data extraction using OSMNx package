@@ -1,0 +1,83 @@
+Data extraction using OSMNx package
+
+#download the PoI of urban amenities in Surakarta city
+
+import osmnx as ox
+import geopandas as gpd
+import os
+
+place = ['Surakarta, Indonesia']
+
+# Get the City Boundary
+gdf_boundary = ox.geocode_to_gdf(place)
+
+# Get the building footprints
+build = {'building': True}
+gdf_buildings = ox.geometries_from_place(place, build)
+
+# Filter only polygon geometries
+gdf_buildings = gdf_buildings[gdf_buildings.geometry.type == 'Polygon']
+
+
+# Define the tags for schools, banks, parks, and hospitals
+tags = {
+    'amenity': ['school', 'bank', 'hospital'],
+    'leisure': 'park'
+}
+
+# Download the PoI data
+gdf_pois = ox.geometries_from_place(place, tags)
+
+# Filter to keep only point geometries
+gdf_points = gdf_pois[gdf_pois.geometry.type == 'Point']
+
+# Visualize the PoI data and boundary
+ax = gdf_boundary.plot(edgecolor='red', facecolor='none')
+
+# Visualize the building footprints and street network on the same plot
+gdf_buildings.plot(ax=ax, color='grey')
+gdf_points.plot (ax=ax, marker='o', color='green', markersize=5)
+
+
+
+
+
+# Define the directory where you want to save the shapefiles
+output_directory = r'C:\Users\Nakamura Lab\data'
+if not os.path.exists(output_directory):
+    os.makedirs(output_directory)
+
+# Define the complete path for the shapefile
+pois_shapefile_path = os.path.join(output_directory, 'Solo_pois_points.shp')
+
+# Save the PoI data to a Shapefile
+gdf_points.to_file(pois_shapefile_path, driver='ESRI Shapefile')
+
+==============================================================================
+extract street network
+
+import networkx as nx
+import osmnx as ox
+
+place = ['Surakarta, Indonesia']
+
+
+# download the street network
+G = ox.graph_from_place(place, network_type='all')
+# Convert the street network to a GeoDataFrame
+gdf_edges = ox.graph_to_gdfs(G, nodes=True)
+
+
+import os
+
+# Define the file path for exporting
+output_dir = r"C:\Post Doctoral Research\LeaRning Spatial\Surakarta"
+output_path = os.path.join(output_dir, "Surakarta_Street.shp")
+
+# Extract only edges (streets) from the GeoDataFrame
+gdf_edges_only = gdf_edges[1]  # The second element of gdf_edges contains edges
+
+# Export the edges to a shapefile
+gdf_edges_only.to_file(output_path, driver="ESRI Shapefile")
+
+print(f"Street network data successfully exported to {output_path}")
