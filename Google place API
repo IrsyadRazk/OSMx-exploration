@@ -1,0 +1,82 @@
+Scrapping from google place API
+
+!pip install geopandas shapely requests pandas tqdm
+
+import geopandas as gpd
+
+# Load the Surakarta boundary shapefile
+shapefile_path = r"C:\Spatial Data\Learning OSMNx\SurakartaOSMNx\surakarta_boundary.shp"
+surakarta_boundary = gpd.read_file(shapefile_path)
+
+# Get the bounding box of the Surakarta boundary
+bounding_box = surakarta_boundary.total_bounds  # [minx, miny, maxx, maxy]
+
+print("Bounding Box:", bounding_box)
+
+import requests
+
+# Google Places API key
+api_key = 'insert your API key here'
+
+# Define the search parameters
+search_type = 'restaurant'  # Search for restaurants
+radius = 10000  # Radius in meters
+
+# Define the center point for your search based on the bounding box
+center_lat = (bounding_box[1] + bounding_box[3]) / 2
+center_lng = (bounding_box[0] + bounding_box[2]) / 2
+
+location = f"{center_lat},{center_lng}"
+
+import pandas as pd
+from tqdm import tqdm
+
+# Function to fetch places from Google Places API
+def fetch_places(api_key, location, search_type, radius):
+    url = f"https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+    params = {
+        "key": api_key,
+        "location": location,
+        "radius": radius,
+        "type": search_type
+    }
+    
+    places = []
+    while True:
+        response = requests.get(url, params=params)
+        results = response.json()
+        places.extend(results['results'])
+        if 'next_page_token' not in results:
+            break
+        else:
+            params['pagetoken'] = results['next_page_token']
+            tqdm.sleep(2)  # Google API requires a short delay between requests
+            
+    return places
+
+# Fetch restaurants within the bounding box
+restaurants = fetch_places(api_key, location, search_type, radius)
+print(f"Found {len(restaurants)} restaurants.")
+
+from shapely.geometry import Point
+
+# Convert the boundary to a Shapely object for easy filtering
+surakarta_boundary_polygon = surakarta_boundary.geometry.unary_union
+
+# Filter restaurants within the Surakarta boundary
+filtered_restaurants = []
+for restaurant in restaurants:
+    restaurant_location = Point(restaurant['geometry']['location']['lng'], restaurant['geometry']['location']['lat'])
+    if surakarta_boundary_polygon.contains(restaurant_location):
+        filtered_restaurants.append(restaurant)
+
+print(f"Filtered to {len(filtered_restaurants)} restaurants within Surakarta boundary.")
+
+# Convert to a pandas DataFrame
+restaurants_df = pd.DataFrame(filtered_restaurants)
+
+# Save to a CSV file (if you want to save to shp just change .shp)
+output_path = r"C:\Spatial Data\Learning OSMNx\SurakartaOSMNx\restaurants.csv"
+restaurants_df.to_csv(output_path, index=False)
+
+print(f"Saved {len(filtered_restaurants)} restaurants to {output_path}")
